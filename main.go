@@ -33,7 +33,9 @@ func main() {
 	go taskWorker.Run(workersCount)
 
 	var router = mux.NewRouter()
-	router.HandleFunc("/v1/fetch_task", handlers.FetchTask(taskWorker.TaskChan)).Methods("GET")
+	router.HandleFunc("/v1/fetchtask", handlers.FetchTask(taskWorker.TaskChan)).Methods("GET")
+	router.HandleFunc("/v1/tasks/{page}", handlers.GetTasks(taskWorker)).Methods("GET")
+	router.HandleFunc("/v1/tasks/{id}", handlers.DeleteTask(taskWorker)).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(addr, router))
 }

@@ -1,16 +1,20 @@
 package worker
 
 import (
+	"doorkeeper/constants"
 	"doorkeeper/models"
+	"doorkeeper/utils"
 	"sync"
 )
 
-type Worker struct {
-	TaskChan chan *models.Task // chanel for task
-	wg       *sync.WaitGroup
+type TaskCache map[utils.UID]*models.Task // cache for tasks: map[UID]Task
 
+// Worker of tasks
+type Worker struct {
+	TaskChan  chan *models.Task // chanel for task
+	wg        *sync.WaitGroup
+	taskCache TaskCache
 	*sync.RWMutex
-	taskCache map[string]string // cache for tasks: map[address]method
 }
 
 func NewWorker(wg *sync.WaitGroup) *Worker {
@@ -18,10 +22,11 @@ func NewWorker(wg *sync.WaitGroup) *Worker {
 		wg:        wg,
 		RWMutex:   &sync.RWMutex{},
 		TaskChan:  make(chan *models.Task),
-		taskCache: make(map[string]string),
+		taskCache: make(map[utils.UID]*models.Task),
 	}
 }
 
+// Run - run gorutines of processing incoming tasks
 func (w *Worker) Run(workers int) {
 	for i := 0; i < workers; i++ {
 		w.wg.Add(1)
@@ -29,8 +34,11 @@ func (w *Worker) Run(workers int) {
 	}
 
 	w.wg.Wait()
+
+	close(w.TaskChan)
 }
 
+// work - processing incoming tasks
 func (w *Worker) work() {
 	w.wg.Done()
 	for task := range w.TaskChan {
@@ -38,8 +46,61 @@ func (w *Worker) work() {
 	}
 }
 
+// saveTask - save task in cache
 func (w *Worker) saveTask(task *models.Task) {
 	w.Lock()
-	w.taskCache[task.Address] = task.Method
+	w.taskCache[task.ID] = task
+	w.Unlock()
+}
+
+// GetTaskCache() return all saving tasks
+func (w *Worker) GetTaskCache() *TaskCache {
+	w.RLock()
+	var result = &w.taskCache
+	w.RUnlock()
+	return result
+}
+
+func (w *Worker) countAllTasks() int {
+	w.RLock()
+	var result = len(w.taskCache)
+	w.RUnlock()
+	return result
+}
+
+func (w *Worker) GetTasksPage(pageNumber int) []*models.Task {
+	var (
+		result        []*models.Task
+		count         int
+		countAllTasks = w.countAllTasks()
+		start         = (pageNumber - 1) * constants.TaskCountOnPage
+		stop          = start + constants.TaskCountOnPage
+	)
+
+	if start > countAllTasks {
+		return result
+	}
+
+	if stop > countAllTasks {
+		stop = countAllTasks
+	}
+
+	w.RLock()
+	for _, task := range w.taskCache {
+		count++
+		if count < start || count > stop {
+			continue
+		}
+
+		result = append(result, task)
+	}
+	w.RUnlock()
+
+	return result
+}
+
+func (w *Worker) DeleteTask(id utils.UID) {
+	w.Lock()
+	delete(w.taskCache, id)
 	w.Unlock()
 }

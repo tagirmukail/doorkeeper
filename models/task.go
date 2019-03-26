@@ -1,6 +1,7 @@
 package models
 
 import (
+	"doorkeeper/utils"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -8,12 +9,14 @@ import (
 
 // Task - struct of represent task of request
 type Task struct {
-	Method  string `json:"method"`
-	Address string `json:"address"`
+	ID      utils.UID `json:"id"`
+	Method  string    `json:"method"`
+	Address string    `json:"address"`
 }
 
-func NewTask(method, adderss string) *Task {
+func NewTask(id utils.UID, method, adderss string) *Task {
 	return &Task{
+		ID:      id,
 		Method:  method,
 		Address: adderss,
 	}

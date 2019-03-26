@@ -2,9 +2,13 @@ package handlers
 
 import (
 	"doorkeeper/models"
+	"doorkeeper/utils"
+	"doorkeeper/worker"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -36,6 +40,15 @@ func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 			return
 		}
 
+		uid, err := utils.GenerateUID()
+		if err != nil {
+			log.Printf("FetchTask() GenerateUID() error: %v", err)
+			http.Error(w, "Task not valid", http.StatusInternalServerError)
+			return
+		}
+
+		task.ID = uid
+
 		taskChan <- task
 
 		tr := &http.Transport{
@@ -60,17 +73,43 @@ func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 			return
 		}
 
-		answer, err := models.NewAnswer(resp)
-		if err != nil {
-			log.Printf("FetchTask() NewAnswer error: %v", err)
-			http.Error(w, "Answer error", http.StatusInternalServerError)
-			return
-		}
-
+		answer := models.NewAnswer(resp, uid)
 		err = json.NewEncoder(w).Encode(answer)
 		if err != nil {
 			log.Printf("FetchTask() Encode Answer error: %v", err)
 			http.Error(w, "Answer error", http.StatusInternalServerError)
+			return
+		}
+
+		return
+	}
+}
+
+func GetTasks(worker *worker.Worker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet {
+			http.Error(w, "Request method allowed only GET", http.StatusForbidden)
+			return
+		}
+
+		var pageNumberStr = mux.Vars(r)["page"]
+		pageNumber, err := strconv.Atoi(pageNumberStr)
+		if err != nil {
+			http.Error(w, "Page is not number", http.StatusForbidden)
+			return
+		}
+
+		var tasks = worker.GetTasksPage(pageNumber)
+		if len(tasks) == 0 {
+			http.Error(w, "Page is not number", http.StatusForbidden)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(tasks)
+		if err != nil {
+			log.Printf("GetTasks() Encode Tasks error: %v", err)
+			http.Error(w, "Get Tasks error", http.StatusInternalServerError)
 			return
 		}
 
