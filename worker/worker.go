@@ -16,6 +16,7 @@ type Worker struct {
 func NewWorker(wg *sync.WaitGroup) *Worker {
 	return &Worker{
 		wg:        wg,
+		RWMutex:   &sync.RWMutex{},
 		TaskChan:  make(chan *models.Task),
 		taskCache: make(map[string]string),
 	}

@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
+//GenerateUUID generate unique identificator
 func GenerateUUID() (uuid string) {
-
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {

@@ -30,6 +30,7 @@ func main() {
 	var wg = &sync.WaitGroup{}
 
 	var taskWorker = worker.NewWorker(wg)
+	go taskWorker.Run(workersCount)
 
 	var router = mux.NewRouter()
 	router.HandleFunc("/v1/fetch_task", handlers.FetchTask(taskWorker.TaskChan)).Methods("GET")
