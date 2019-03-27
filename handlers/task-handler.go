@@ -81,7 +81,7 @@ func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 	}
 }
 
-func GetTasks(worker *worker.Worker) http.HandlerFunc {
+func GetTasks(worker *worker.Worker, taskCountOnPage int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -92,7 +92,7 @@ func GetTasks(worker *worker.Worker) http.HandlerFunc {
 			return
 		}
 
-		var tasks = worker.GetTasksPage(pageNumber)
+		var tasks = worker.GetTasksPage(pageNumber, taskCountOnPage)
 		if len(tasks) == 0 {
 			http.Error(w, "Not found tasks", http.StatusNotFound)
 			return

@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"doorkeeper/constants"
 	"doorkeeper/models"
 	"doorkeeper/utils"
 	"log"
@@ -68,13 +67,13 @@ func (w *Worker) countAllTasks() int {
 	return result
 }
 
-func (w *Worker) GetTasksPage(pageNumber int) []*models.Task {
+func (w *Worker) GetTasksPage(pageNumber, taskCountOnPage int) []*models.Task {
 	var (
 		result        []*models.Task
 		count         int
 		countAllTasks = w.countAllTasks()
-		start         = (pageNumber - 1) * constants.TaskCountOnPage
-		stop          = start + constants.TaskCountOnPage
+		start         = (pageNumber - 1) * taskCountOnPage
+		stop          = start + taskCountOnPage
 	)
 
 	if pageNumber <= 0 {

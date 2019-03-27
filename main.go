@@ -1,13 +1,13 @@
 package main
 
 import (
+	"doorkeeper/config"
 	"doorkeeper/handlers"
 	"doorkeeper/worker"
 	"flag"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-	"os"
 	"runtime/debug"
 	"sync"
 )
@@ -19,23 +19,24 @@ func main() {
 		}
 	}()
 
-	var addr string
-	var workersCount int
-	flag.StringVar(&addr, "addr", "0.0.0.0:8000", "Default: 0.0.0.0:8000")
-	flag.IntVar(&workersCount, "workers", 2, "Default: 2")
 	flag.Parse()
 
-	log.Printf("<<<<<<<<Service started: %v>>>>>>>>", os.Args[1:])
+	cfg, err := config.NewConfig("./config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("<<<<<<<<Service started: %+v>>>>>>>>", cfg)
 
 	var wg = &sync.WaitGroup{}
 
 	var taskWorker = worker.NewWorker(wg)
-	go taskWorker.Run(workersCount)
+	go taskWorker.Run(cfg.Workers)
 
 	var router = mux.NewRouter()
-	router.HandleFunc("/v1/fetchtask", handlers.FetchTask(taskWorker.TaskChan)).Methods("GET")
-	router.HandleFunc("/v1/tasks/{page}", handlers.GetTasks(taskWorker)).Methods("GET")
-	router.HandleFunc("/v1/tasks/{id}", handlers.DeleteTask(taskWorker)).Methods("DELETE")
+	router.HandleFunc("/v1/fetchtask", handlers.FetchTask(taskWorker.TaskChan)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/tasks/{page}", handlers.GetTasks(taskWorker, cfg.TaskCountOnPage)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/tasks/{id}", handlers.DeleteTask(taskWorker)).Methods(http.MethodDelete)
 
-	log.Fatal(http.ListenAndServe(addr, router))
+	log.Fatal(http.ListenAndServe(cfg.Address, router))
 }
