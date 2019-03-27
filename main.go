@@ -1,15 +1,17 @@
 package main
 
 import (
-	"doorkeeper/config"
-	"doorkeeper/handlers"
-	"doorkeeper/worker"
 	"flag"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"runtime/debug"
 	"sync"
+
+	"github.com/gorilla/mux"
+
+	"doorkeeper/config"
+	"doorkeeper/handlers"
+	"doorkeeper/worker"
 )
 
 func main() {

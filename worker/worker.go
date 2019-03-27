@@ -1,10 +1,11 @@
 package worker
 
 import (
-	"doorkeeper/models"
-	"doorkeeper/utils"
 	"log"
 	"sync"
+
+	"doorkeeper/models"
+	"doorkeeper/utils"
 )
 
 type TaskCache map[utils.UID]*models.Task // cache for tasks: map[UID]Task

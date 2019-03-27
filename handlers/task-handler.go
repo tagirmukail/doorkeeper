@@ -1,15 +1,17 @@
 package handlers
 
 import (
-	"doorkeeper/models"
-	"doorkeeper/utils"
-	"doorkeeper/worker"
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/mux"
+
+	"doorkeeper/models"
+	"doorkeeper/utils"
+	"doorkeeper/worker"
 )
 
 func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {

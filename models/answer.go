@@ -1,8 +1,9 @@
 package models
 
 import (
-	"doorkeeper/utils"
 	"net/http"
+
+	"doorkeeper/utils"
 )
 
 type Answer struct {
