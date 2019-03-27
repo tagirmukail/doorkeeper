@@ -15,10 +15,6 @@ import (
 func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodGet {
-			http.Error(w, "Request method allowed only GET", http.StatusForbidden)
-			return
-		}
 
 		taskStr := r.URL.Query().Get("task")
 		if taskStr == "" {
@@ -88,21 +84,17 @@ func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 func GetTasks(worker *worker.Worker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodGet {
-			http.Error(w, "Request method allowed only GET", http.StatusForbidden)
-			return
-		}
 
 		var pageNumberStr = mux.Vars(r)["page"]
 		pageNumber, err := strconv.Atoi(pageNumberStr)
 		if err != nil {
-			http.Error(w, "Page is not number", http.StatusForbidden)
+			http.Error(w, "Page number must be greater than 0", http.StatusForbidden)
 			return
 		}
 
 		var tasks = worker.GetTasksPage(pageNumber)
 		if len(tasks) == 0 {
-			http.Error(w, "Page is not number", http.StatusForbidden)
+			http.Error(w, "Not found tasks", http.StatusNotFound)
 			return
 		}
 
@@ -113,6 +105,19 @@ func GetTasks(worker *worker.Worker) http.HandlerFunc {
 			return
 		}
 
+		return
+	}
+}
+
+func DeleteTask(worker *worker.Worker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		var uid = mux.Vars(r)["id"]
+
+		worker.DeleteTask(utils.UID(uid))
+
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 }

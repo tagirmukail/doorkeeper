@@ -4,6 +4,7 @@ import (
 	"doorkeeper/constants"
 	"doorkeeper/models"
 	"doorkeeper/utils"
+	"log"
 	"sync"
 )
 
@@ -33,9 +34,8 @@ func (w *Worker) Run(workers int) {
 		go w.work()
 	}
 
+	log.Printf("Worker run.")
 	w.wg.Wait()
-
-	close(w.TaskChan)
 }
 
 // work - processing incoming tasks
@@ -77,6 +77,10 @@ func (w *Worker) GetTasksPage(pageNumber int) []*models.Task {
 		stop          = start + constants.TaskCountOnPage
 	)
 
+	if pageNumber <= 0 {
+		return result
+	}
+
 	if start > countAllTasks {
 		return result
 	}
@@ -87,11 +91,12 @@ func (w *Worker) GetTasksPage(pageNumber int) []*models.Task {
 
 	w.RLock()
 	for _, task := range w.taskCache {
-		count++
-		if count < start || count > stop {
+		if count < start || count >= stop {
+			count++
 			continue
 		}
 
+		count++
 		result = append(result, task)
 	}
 	w.RUnlock()
