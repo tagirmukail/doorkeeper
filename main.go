@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -32,11 +33,16 @@ func main() {
 
 	var wg = &sync.WaitGroup{}
 
-	var taskWorker = worker.NewWorker(wg)
+	var tr = http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    30 * time.Second,
+		DisableCompression: true,
+	}
+	var taskWorker = worker.NewWorker(wg, tr)
 	go taskWorker.Run(cfg.Workers)
 
 	var router = mux.NewRouter()
-	router.HandleFunc("/v1/fetchtask", handlers.FetchTask(taskWorker.TaskChan)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/fetchtask", handlers.FetchTask(taskWorker)).Methods(http.MethodGet)
 	router.HandleFunc("/v1/tasks/{page}", handlers.GetTasks(taskWorker, cfg.TaskCountOnPage)).Methods(http.MethodGet)
 	router.HandleFunc("/v1/tasks/{id}", handlers.DeleteTask(taskWorker)).Methods(http.MethodDelete)
 

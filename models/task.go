@@ -2,6 +2,7 @@ package models
 
 import (
 	"doorkeeper/utils"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,16 +15,30 @@ type Task struct {
 	Address string    `json:"address"`
 }
 
-func NewTask(id utils.UID, method, adderss string) *Task {
-	return &Task{
-		ID:      id,
-		Method:  method,
-		Address: adderss,
+func NewTask(taskByte []byte) (*Task, error) {
+	var task = &Task{}
+
+	err := json.Unmarshal([]byte(taskByte), task)
+	if err != nil {
+		return nil, err
 	}
+
+	err = task.validate()
+	if err != nil {
+		return nil, err
+	}
+
+	uid, err := utils.GenerateUID()
+	if err != nil {
+		return nil, err
+	}
+
+	task.ID = uid
+	return task, nil
 }
 
 // validate task
-func (t *Task) Validate() error {
+func (t *Task) validate() error {
 	switch t.Method {
 	case http.MethodGet:
 		break
