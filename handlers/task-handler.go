@@ -2,19 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
-	"time"
-
-	"github.com/gorilla/mux"
 
 	"doorkeeper/models"
 	"doorkeeper/utils"
 	"doorkeeper/worker"
 )
 
-func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
+func FetchTask(taskWorker *worker.Worker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -24,54 +22,23 @@ func FetchTask(taskChan chan<- *models.Task) http.HandlerFunc {
 			return
 		}
 
-		task := &models.Task{}
-		err := json.Unmarshal([]byte(taskStr), task)
+		task, err := models.NewTask([]byte(taskStr))
 		if err != nil {
-			http.Error(w, "Task is not json", http.StatusBadRequest)
+			log.Printf("models.NewTask() error: %v", err)
+			http.Error(w, "Bad task", http.StatusBadRequest)
 			return
 		}
 
-		err = task.Validate()
+		taskWorker.SendTask(task)
+
+		resp, err := taskWorker.DoTask(task)
 		if err != nil {
-			log.Printf("FetchTask() validation error: %v", err)
-			http.Error(w, "Task not valid", http.StatusBadRequest)
+			log.Printf("FetchTask() error: %v", err)
+			http.Error(w, "Task request error", http.StatusBadRequest)
 			return
 		}
 
-		uid, err := utils.GenerateUID()
-		if err != nil {
-			log.Printf("FetchTask() GenerateUID() error: %v", err)
-			http.Error(w, "Task not valid", http.StatusInternalServerError)
-			return
-		}
-
-		task.ID = uid
-
-		taskChan <- task
-
-		tr := &http.Transport{
-			MaxIdleConns:       10,
-			IdleConnTimeout:    30 * time.Second,
-			DisableCompression: true,
-		}
-
-		httpClient := http.Client{Transport: tr}
-
-		req, err := http.NewRequest(task.Method, task.Address, nil)
-		if err != nil {
-			log.Printf("FetchTask() NewRequest() error: %v", err)
-			http.Error(w, "Task request error", http.StatusInternalServerError)
-			return
-		}
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			log.Printf("FetchTask() httpClient.Do() error: %v", err)
-			http.Error(w, "Task request error", http.StatusInternalServerError)
-			return
-		}
-
-		answer := models.NewAnswer(resp, uid)
+		answer := models.NewAnswer(resp, task.ID)
 		err = json.NewEncoder(w).Encode(answer)
 		if err != nil {
 			log.Printf("FetchTask() Encode Answer error: %v", err)

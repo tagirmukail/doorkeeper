@@ -1,29 +1,31 @@
 package worker
 
 import (
-	"log"
-	"sync"
-
 	"doorkeeper/models"
 	"doorkeeper/utils"
+	"log"
+	"net/http"
+	"sync"
 )
 
-type TaskCache map[utils.UID]*models.Task // cache for tasks: map[UID]Task
+type TaskCache []*models.Task // cache for tasks: map[UID]Task
 
 // Worker of tasks
 type Worker struct {
-	TaskChan  chan *models.Task // chanel for task
-	wg        *sync.WaitGroup
-	taskCache TaskCache
+	taskChan   chan *models.Task // chanel for task
+	wg         *sync.WaitGroup
+	taskCache  TaskCache
+	taskClient *http.Client
 	*sync.RWMutex
 }
 
-func NewWorker(wg *sync.WaitGroup) *Worker {
+func NewWorker(wg *sync.WaitGroup, tr http.Transport) *Worker {
 	return &Worker{
-		wg:        wg,
-		RWMutex:   &sync.RWMutex{},
-		TaskChan:  make(chan *models.Task),
-		taskCache: make(map[utils.UID]*models.Task),
+		wg:         wg,
+		RWMutex:    &sync.RWMutex{},
+		taskChan:   make(chan *models.Task),
+		taskCache:  []*models.Task{},
+		taskClient: &http.Client{Transport: &tr},
 	}
 }
 
@@ -41,16 +43,36 @@ func (w *Worker) Run(workers int) {
 // work - processing incoming tasks
 func (w *Worker) work() {
 	w.wg.Done()
-	for task := range w.TaskChan {
+	for task := range w.taskChan {
 		w.saveTask(task)
 	}
+}
+
+// SendTask for further processing
+func (w *Worker) SendTask(task *models.Task) {
+	w.taskChan <- task
 }
 
 // saveTask - save task in cache
 func (w *Worker) saveTask(task *models.Task) {
 	w.Lock()
-	w.taskCache[task.ID] = task
+	w.taskCache = append(w.taskCache, task)
 	w.Unlock()
+}
+
+// DoTask http request by task
+func (w *Worker) DoTask(t *models.Task) (*http.Response, error) {
+	req, err := http.NewRequest(t.Method, t.Address, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := w.taskClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 // GetTaskCache() return all saving tasks
@@ -71,7 +93,6 @@ func (w *Worker) countAllTasks() int {
 func (w *Worker) GetTasksPage(pageNumber, taskCountOnPage int) []*models.Task {
 	var (
 		result        []*models.Task
-		count         int
 		countAllTasks = w.countAllTasks()
 		start         = (pageNumber - 1) * taskCountOnPage
 		stop          = start + taskCountOnPage
@@ -90,22 +111,29 @@ func (w *Worker) GetTasksPage(pageNumber, taskCountOnPage int) []*models.Task {
 	}
 
 	w.RLock()
-	for _, task := range w.taskCache {
-		if count < start || count >= stop {
-			count++
-			continue
-		}
-
-		count++
-		result = append(result, task)
-	}
+	result = w.taskCache[start:stop]
 	w.RUnlock()
 
 	return result
 }
 
 func (w *Worker) DeleteTask(id utils.UID) {
+	var resultCache []*models.Task
+
 	w.Lock()
-	delete(w.taskCache, id)
+	for _, task := range w.taskCache {
+		if task.ID == id {
+			continue
+		}
+
+		resultCache = append(resultCache, task)
+	}
+	w.taskCache = resultCache
+	w.Unlock()
+}
+
+func (w *Worker) SetCache(cache TaskCache) {
+	w.Lock()
+	w.taskCache = cache
 	w.Unlock()
 }
